@@ -1,4 +1,4 @@
-# cms-masterclass-sheets: create sheets for the CMS masterclass
+# Create sheets for the CMS masterclass
 
 ## Installation
 
