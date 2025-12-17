@@ -48,10 +48,7 @@ def get_sheet_id_by_title(service, spreadsheet_id, title):
 
     # Get and return ID
     for s in metadata['sheets']:
-        if s['properties']['title'] == title:
-
-            print(s['properties'])
-            
+        if s['properties']['title'] == title:            
             return s['properties']['sheetId']
 
     raise ValueError(f"Tab with title '{title}' not found'")
@@ -310,6 +307,45 @@ def main():
     ).execute()
 
     summary_sheet_id = result["replies"][0]["addSheet"]["properties"]["sheetId"]
-        
+
+    '''
+    Copy the results part from the template to the Results tab
+    '''
+    source = {
+        "sheetId": 0,
+        "startRowIndex": 2,
+        "endRowIndex": 9,                                                                                      
+        "startColumnIndex": 15,
+        "endColumnIndex": 18,
+    }
+    
+    results_sheet_id = get_sheet_id_by_title(
+            sheets_service,
+            NEW_SPREADSHEET_ID,
+            'Results'
+        )
+    
+    destination = {
+        "sheetId": results_sheet_id,
+        "startRowIndex": 0,
+        "endRowIndex": 7,
+        "startColumnIndex": 0,
+        "endColumnIndex": 2,
+    }
+    
+    copy_paste_request = {
+        "copyPaste": {
+            "source": source,
+            "destination": destination,
+            "pasteType": "PASTE_NORMAL",
+            "pasteOrientation": "NORMAL",
+        }
+    }
+
+    sheets_service.spreadsheets().batchUpdate(
+        spreadsheetId=NEW_SPREADSHEET_ID,
+        body={"requests": [copy_paste_request]}
+    ).execute()
+    
 if __name__ == "__main__":
     main()
