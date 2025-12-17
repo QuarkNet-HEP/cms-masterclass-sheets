@@ -1,5 +1,6 @@
 from __future__ import print_function
 import os.path
+import re
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -80,6 +81,9 @@ def resize_sheet(service, spreadsheet_id, tab_id, nrows):
     ).execute()
 
 
+def total_formula(col_letter):
+    return f'=COUNTIF({col_letter}$3:INDEX({col_letter}:{col_letter},ROW()-1),TRUE)'
+    
 '''
 TODO
 
@@ -220,6 +224,69 @@ def main():
                 spreadsheetId=NEW_SPREADSHEET_ID,
                 body={"requests": [copy_paste_request]}
             ).execute()
+
+
+        '''
+        Once the new rows have been added add the summary row
+        '''
+        checkbox_cols = [
+            "C", "D", "E", "F",
+            "G", "H", "I", "J",
+            "K", "L", "M"
+        ]
+
+        row = ["Totals"] + [""] + [total_formula(c) for c in checkbox_cols]
+        
+        resp = sheets_service.spreadsheets().values().append(
+            spreadsheetId=NEW_SPREADSHEET_ID,
+            range=f"{group['name']}!A:A",
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": [row]},
+        ).execute()
+        
+        updated_range = resp["updates"]["updatedRange"]
+
+        '''
+        Get the value of the new row
+        '''
+        m = re.search(r'!([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$', updated_range)
+        new_row = int(m.group(2)) 
+
+        '''
+        Add the summary formulas
+        '''
+        # Total number of electrons
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=NEW_SPREADSHEET_ID,
+            range=f"{group['name']}!P5",
+            valueInputOption="USER_ENTERED",
+            body={"values": [[f'=C{new_row} + 2*(E{new_row}+I{new_row}) + 4*(G{new_row})']]}
+        ).execute()
+
+        # Total number of muons
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=NEW_SPREADSHEET_ID,
+            range=f"{group['name']}!Q5",
+            valueInputOption="USER_ENTERED",
+            body={"values": [[f'=D{new_row} + 2*(F{new_row}+I{new_row}) + 4*(H{new_row})']]}
+        ).execute()
+
+        # Total number of W+
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=NEW_SPREADSHEET_ID,
+            range=f"{group['name']}!P9",
+            valueInputOption="USER_ENTERED",
+            body={"values": [[f'=J{new_row}']]}
+        ).execute()
+
+        # Total number of W-
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=NEW_SPREADSHEET_ID,
+            range=f"{group['name']}!Q9",
+            valueInputOption="USER_ENTERED",
+            body={"values": [[f'=K{new_row}']]}
+        ).execute()
         
     '''
     Add a Results sheet
