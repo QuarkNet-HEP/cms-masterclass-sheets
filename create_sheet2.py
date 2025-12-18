@@ -222,7 +222,6 @@ def main():
                 body={"requests": [copy_paste_request]}
             ).execute()
 
-
         '''
         Once the new rows have been added add the summary row
         '''
@@ -283,6 +282,71 @@ def main():
             range=f"{group['name']}!Q9",
             valueInputOption="USER_ENTERED",
             body={"values": [[f'=K{new_row}']]}
+        ).execute()
+
+        '''
+        Add the rows with the mass values
+        '''
+        # 2 lepton
+        source = {
+	    "sheetId": 0,
+            "startRowIndex": 2,
+            "endRowIndex": 2+1,
+            "startColumnIndex": 26,
+            "endColumnIndex": 26+1,
+        }
+
+        destination = {
+            "sheetId": sheet_id,
+            "startRowIndex": 2,
+            "endRowIndex": new_row,
+            "startColumnIndex": 26,
+            "endColumnIndex": 26+1,
+        }
+
+        copy_paste_request = {
+            "copyPaste": {
+                "source": source,
+                "destination": destination,
+                "pasteType": "PASTE_NORMAL",
+                "pasteOrientation": "NORMAL",
+            }
+        }
+
+        sheets_service.spreadsheets().batchUpdate(
+            spreadsheetId=NEW_SPREADSHEET_ID,
+            body={"requests": [copy_paste_request]}
+        ).execute()
+        
+        # 4 lepton
+        source = {
+            "sheetId": 0,
+            "startRowIndex": 2,
+            "endRowIndex": 2+1,
+            "startColumnIndex": 27,
+            "endColumnIndex": 27+1,
+        }
+
+        destination = {
+            "sheetId": sheet_id,
+            "startRowIndex": 2,
+            "endRowIndex": new_row,
+            "startColumnIndex": 27,
+            "endColumnIndex": 27+1,
+        }
+        
+        copy_paste_request = {
+            "copyPaste": {
+                "source": source,
+                "destination": destination,
+                "pasteType": "PASTE_NORMAL",
+                "pasteOrientation": "NORMAL",
+            }
+        }
+
+        sheets_service.spreadsheets().batchUpdate(
+            spreadsheetId=NEW_SPREADSHEET_ID,
+            body={"requests": [copy_paste_request]}
         ).execute()
         
     '''
