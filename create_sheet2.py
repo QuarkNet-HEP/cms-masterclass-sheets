@@ -77,10 +77,30 @@ def resize_sheet(service, spreadsheet_id, tab_id, nrows):
         body=resize_request
     ).execute()
 
-
 def total_formula(col_letter):
     return f'=COUNTIF({col_letter}$3:INDEX({col_letter}:{col_letter},ROW()-1),TRUE)'
-    
+
+def add_dataset_numbers(service,
+                        sheet_name,
+                        spreadsheet_id,
+                        row_number,
+                        dataset_number):
+
+    updates = []
+
+    updates.append({
+        "range": f"{sheet_name}!A{row_number}",
+        "values": [[int(dataset_number)]],
+    })
+
+    service.spreadsheets().values().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={
+            "valueInputOption": "RAW",
+            "data": updates,
+        },
+    ).execute()
+
 '''
 TODO
 
@@ -222,6 +242,14 @@ def main():
                 body={"requests": [copy_paste_request]}
             ).execute()
 
+            add_dataset_numbers(
+                sheets_service,
+                group['name'],
+                NEW_SPREADSHEET_ID, 
+                source_end_row_index+1,
+                n+1
+            )
+            
         '''
         Once the new rows have been added add the summary row
         '''
@@ -299,7 +327,7 @@ def main():
         destination = {
             "sheetId": sheet_id,
             "startRowIndex": 2,
-            "endRowIndex": new_row,
+            "endRowIndex": new_row-1,
             "startColumnIndex": 26,
             "endColumnIndex": 26+1,
         }
@@ -330,7 +358,7 @@ def main():
         destination = {
             "sheetId": sheet_id,
             "startRowIndex": 2,
-            "endRowIndex": new_row,
+            "endRowIndex": new_row-1,
             "startColumnIndex": 27,
             "endColumnIndex": 27+1,
         }
