@@ -1,6 +1,7 @@
 from __future__ import print_function
 import os.path
 import re
+import click
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -101,21 +102,30 @@ def add_dataset_numbers(service,
         },
     ).execute()
 
-'''
-TODO
-
-Use click to add command line options such as
-name of sheet and number of sheets (groups of students)
-'''
-
-def main():
+@click.command()
+@click.option(
+    "--name",
+    "name",
+    type=str,
+    required=True,
+    help="Add a new spreadsheet with the name: --sheetname <str>"
+)
+@click.option(
+    "--tab",
+    "tabs",
+    type=(str, int),
+    multiple=True,
+    required=True,
+    help="Add a new tab (name and number of datasets): --tab <str> <int> (repeatable)"
+) 
+def main(name, tabs):
     creds = get_creds()
 
     sheets_service = build("sheets", "v4", credentials=creds)
     drive_service = build("drive", "v3", credentials=creds)
 
     copy_body = {
-        "name": "CMS Masterclass - 31 Dec, London",
+        "name": name,
         "parents": [FOLDER_ID]
     }
 
@@ -144,20 +154,11 @@ def main():
     
     requests = []
 
-    new_groups = [
-        {
-            'name': 'Sheen',
-            'ndatasets': 7
-        },
-        {
-            'name': 'Mortlake',
-            'ndatasets': 5
-        },
-        {
-            'name': 'Barnes',
-            'ndatasets': 3
-        }
-    ]
+    tabs = list(tabs)
+    new_groups = [{'name':t[0],'ndatasets':t[1]} for t in tabs]
+
+    print(f'Making a new sheet: {name}')
+    print(f'With tabs: {new_groups}')
 
     '''
     First rename the first tab
