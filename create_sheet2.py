@@ -102,6 +102,52 @@ def add_dataset_numbers(service,
         },
     ).execute()
 
+def get_tabs(service,
+             spreadsheet_id):
+
+    meta = service.spreadsheets().get(
+        spreadsheetId=spreadsheet_id,
+        fields="sheets(properties(sheetId,title,hidden))"
+    ).execute()
+
+    tabs = []
+    for sh in meta.get("sheets", []):
+        props = sh["properties"]
+        title = props["title"]
+        
+        if title == 'Results':
+            continue
+        if props.get("hidden", False):
+            continue  # optional
+        
+        tabs.append({"title": title, "sheetId": props["sheetId"]})
+
+    return tabs
+
+def add_sum_totals_to_results(
+        service,
+        spreadsheet_id,
+        tab_names,
+        source_cell,
+        destination_cell):
+    
+    sum_term = ",".join([f"'{tb}'!{source_cell}" for tb in tab_names])
+
+    values = [{
+        "range": f"Results!{destination_cell}",
+        "values": [[f"=SUM({sum_term})"]],
+    }]
+
+    body = {
+        "valueInputOption": "USER_ENTERED",
+        "data": values
+    }
+
+    service.spreadsheets().values().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body=body
+    ).execute()
+
 @click.command()
 @click.option(
     "--name",
@@ -439,6 +485,36 @@ def main(name, tabs):
         spreadsheetId=NEW_SPREADSHEET_ID,
         body={"requests": [copy_paste_request]}
     ).execute()
+
+    '''
+    Iterate through the tabs and add
+    results to the Results tab
+    '''    
+    tab_names = [g['name'] for g in new_groups]
+
+    # electron totals
+    add_sum_totals_to_results(
+        sheets_service, NEW_SPREADSHEET_ID,
+        tab_names, "P5", "A3"
+    )
+
+    # muon totals
+    add_sum_totals_to_results(
+        sheets_service, NEW_SPREADSHEET_ID,
+        tab_names, "Q5", "B3"
+    )
+
+    # W+ totals
+    add_sum_totals_to_results(
+        sheets_service, NEW_SPREADSHEET_ID,
+        tab_names, "P9", "A7"
+    )
+
+    # W- totals
+    add_sum_totals_to_results(
+        sheets_service, NEW_SPREADSHEET_ID,
+        tab_names, "Q9", "B7"
+    )
     
 if __name__ == "__main__":
     main()
