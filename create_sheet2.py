@@ -7,6 +7,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
+from typing import List, Tuple, Dict, Optional
+
 OAUTH_CLIENT_FILE = "oauth_client_secret.json"
 TOKEN_FILE = "token.json"
 
@@ -40,7 +42,11 @@ def get_creds():
 
     return creds
 
-def get_sheet_id_by_title(service, spreadsheet_id, title):
+def get_sheet_id_by_title(
+        service,
+        spreadsheet_id: str,
+        title: str
+) -> str:
 
     # Get sheet metadata
     metadata = service.spreadsheets().get(
@@ -54,7 +60,12 @@ def get_sheet_id_by_title(service, spreadsheet_id, title):
 
     raise ValueError(f"Tab with title '{title}' not found'")
     
-def resize_sheet(service, spreadsheet_id, tab_id, nrows):
+def resize_sheet(
+        service,
+        spreadsheet_id: str,
+        tab_id: str,
+        nrows: int
+):
 
     resize_request = {
         "requests": [
@@ -78,15 +89,39 @@ def resize_sheet(service, spreadsheet_id, tab_id, nrows):
         body=resize_request
     ).execute()
 
-def total_formula(col_letter):
+def total_formula(col_letter: str) -> str:
     return f'=COUNTIF({col_letter}$3:INDEX({col_letter}:{col_letter},ROW()-1),TRUE)'
 
-def add_dataset_numbers(service,
-                        sheet_name,
-                        spreadsheet_id,
-                        row_number,
-                        dataset_number):
+def append_rows(
+        service,
+        spreadsheet_id: str,
+        tab_id: str,
+        n_rows: int
+):
+    '''
+    Add n_rows to a tab given by tab_id
+    '''
+    body = {
+        "requests": [{
+            "appendDimension": {
+                "sheetId": tab_id,
+                "dimension": "ROWS",
+                "length": n_rows
+            }
+        }]
+    }
+    service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body=body
+    ).execute()
 
+def add_dataset_numbers(
+        service,
+        sheet_name: str,
+        spreadsheet_id: str,
+        row_number: int,
+        dataset_number: int
+):
     updates = []
 
     updates.append({
@@ -102,8 +137,7 @@ def add_dataset_numbers(service,
         },
     ).execute()
 
-def get_tabs(service,
-             spreadsheet_id):
+def get_tabs(service, spreadsheet_id: str) -> List[Dict[str,str]]:
 
     meta = service.spreadsheets().get(
         spreadsheetId=spreadsheet_id,
@@ -126,10 +160,11 @@ def get_tabs(service,
 
 def add_sum_totals_to_results(
         service,
-        spreadsheet_id,
-        tab_names,
-        source_cell,
-        destination_cell):
+        spreadsheet_id: str,
+        tab_names: List[str],
+        source_cell: str,
+        destination_cell: str
+):
     
     sum_term = ",".join([f"'{tb}'!{source_cell}" for tb in tab_names])
 
@@ -148,6 +183,28 @@ def add_sum_totals_to_results(
         body=body
     ).execute()
 
+def quote_sheet(name: str) -> str:
+    # Google Sheets uses single quotes for sheet names; escape any single quote by doubling it
+    return "'" + name.replace("'", "''") + "'"
+
+def make_vstack_formula(
+        tab_names: List[str],
+        col: str,
+        start_row: str,
+        end_row: Optional[str] = None
+) -> str:    
+    row_part = f"{start_row}:{col}" if end_row is None else f"{start_row}:{end_row}"
+
+    if end_row is None:
+        refs = [f"{quote_sheet(t)}!{col}{start_row}:{col}" for t in tab_names]
+    else:
+        refs = [f"{quote_sheet(t)}!{col}{start_row}:{col}{end_row}" for t in tab_names]
+
+    vstack = f"VSTACK({', '.join(refs)})"
+    return (
+        f'=IFERROR(LET(data,{vstack},FILTER(data,ISNUMBER(data))),"")'
+    )
+    
 @click.command()
 @click.option(
     "--name",
@@ -445,8 +502,6 @@ def main(name, tabs):
         body=results_request
     ).execute()
 
-    summary_sheet_id = result["replies"][0]["addSheet"]["properties"]["sheetId"]
-
     '''
     Copy the results part from the template to the Results tab
     '''
@@ -515,6 +570,33 @@ def main(name, tabs):
         sheets_service, NEW_SPREADSHEET_ID,
         tab_names, "Q9", "B7"
     )
+
+    '''
+    Copy the input from columns AA and AB in the
+    input tabs to X and Y in the results tab
+    '''
+    '''
+    # First write the tab names to column W
+    sheets_service.spreadsheets().values().update(
+        spreadsheetId=NEW_SPREADSHEET_ID,
+        range=f"Results!W1:W",
+        valueInputOption="RAW",
+        body={"majorDimension":"COLUMNS","values":[tab_names]},
+    ).execute()
+    '''
+    
+    twol_formula  = make_vstack_formula(tab_names, col="AA", start_row=3)
+    fourl_formula = make_vstack_formula(tab_names, col="AB", start_row=3)
+
+    updates = [
+        {"range": "Results!X1", "values": [[twol_formula]]},
+        {"range": "Results!Y1", "values": [[fourl_formula]]},
+    ]
+
+    sheets_service.spreadsheets().values().batchUpdate(
+        spreadsheetId=NEW_SPREADSHEET_ID,
+        body={"valueInputOption": "USER_ENTERED", "data": updates},
+    ).execute()
     
 if __name__ == "__main__":
     main()
