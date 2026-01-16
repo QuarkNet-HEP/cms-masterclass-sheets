@@ -209,7 +209,78 @@ def make_vstack_formula(
 def _chunked(iterable, chunk_size: int):
     for i in range(0, len(iterable), chunk_size):
         yield iterable[i:i + chunk_size]
-        
+
+def add_mass_histograms(service, results_sheet_id: str, spreadsheet_id: str):
+
+    start_row_index = 0
+    
+    def histogram_add_request(*, col_index: int, title: str, anchor_row: int):
+        return {
+            "addChart": {
+                "chart": {
+                    "spec": {
+                        "title": title,
+                        "histogramChart": {
+                            "legendPosition": "NO_LEGEND",
+                            "series": [
+                                {
+                                    "data": {
+                                        "sourceRange": {
+                                            "sources": [
+                                                {
+                                                    "sheetId": results_sheet_id,
+                                                    "startRowIndex": start_row_index,
+                                                    # omit endRowIndex to include to bottom
+                                                    "startColumnIndex": col_index,
+                                                    "endColumnIndex": col_index + 1,  # exclusive
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ],
+                            # Optional tuning knobs:
+                            # "bucketSize": 5,           # fixed bin width, if you want
+                            # "outlierPercentile": 0.0,  # include outliers normally
+                            # "showItemDividers": False
+                        },
+                    },
+                    "position": {
+                        "overlayPosition": {
+                            "anchorCell": {
+                                "sheetId": results_sheet_id,
+                                "rowIndex": anchor_row,
+                                "columnIndex": 0,  # column A
+                            },
+                            "offsetXPixels": 0,
+                            "offsetYPixels": 0,
+                            "widthPixels": 700,
+                            "heightPixels": 380,
+                        }
+                    },
+                }
+            }
+        }
+
+    requests = [
+        histogram_add_request(
+            col_index=24,  # Y
+            title="2-lepton invariant mass",
+            anchor_row=10
+        ),
+        histogram_add_request(
+            col_index=25,  # Z
+            title="4-lepton invariant mass",
+            anchor_row=30
+        ),
+    ]
+
+    service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id,
+        body={"requests": requests}
+    ).execute()
+
+
 @click.command()
 @click.option(
     "--name",
@@ -502,6 +573,11 @@ def main(name, tabs):
         spreadsheetId=NEW_SPREADSHEET_ID,
         body={"valueInputOption": "USER_ENTERED", "data": value_updates},
     ).execute()
+
+    '''
+    Add mass histograms to Results
+    '''
+    add_mass_histograms(sheets_service, results_sheet_id, NEW_SPREADSHEET_ID)
     
 if __name__ == "__main__":
     main()
