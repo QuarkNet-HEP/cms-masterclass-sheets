@@ -110,6 +110,7 @@ def append_rows(
             }
         }]
     }
+    
     service.spreadsheets().batchUpdate(
         spreadsheetId=spreadsheet_id,
         body=body
@@ -307,7 +308,17 @@ def main(name, tabs):
         )
 
         ndatasets = group['ndatasets']
-            
+
+        # We have 1000 rows by default. If more are
+        # needed then add more.
+        if ndatasets*100 > 1000:
+            append_rows(
+                sheets_service,
+                NEW_SPREADSHEET_ID,
+                sheet_id,
+                ndatasets*110
+            )
+                
         source_start_row_index = 2
         nrows = 100
         ncols = 14
@@ -319,7 +330,7 @@ def main(name, tabs):
             "startColumnIndex": 0,
             "endColumnIndex": ncols,
         }
-
+        
         for n in range(1, ndatasets):
 
             source_end_row_index = source_start_row_index + n*nrows
