@@ -34,3 +34,18 @@ For example:
 ```
 python3 create_sheet2_optimize.py --name "16 Jan, Boston" --tab "Cambridge" 45 --tab "Somerville" 34 --tab "Malden" 10
 ```
+
+In addition, one can create a Combination sheet which collects information from the "Results" tab over multiple sheets:
+
+```
+$ python3 create_combination.py --help
+
+Usage: create_combination.py [OPTIONS]
+
+Options:
+  --name TEXT   Add a new spreadsheet with the name: --sheetname <str>
+                [required]
+  --sheet TEXT  : Specify sheets to summarize by url --sheet <str>  [required]
+  --help        Show this message and exit.
+```
+

@@ -63,7 +63,7 @@ def vstack_formula(col: str, sheets: List[str]) -> str:
     "sheets",
     type=str,
     multiple=True,
-    required=False,
+    required=True,
     help=": Specify sheets to summarize by url --sheet <str>"
 ) 
 def main(name, sheets):
