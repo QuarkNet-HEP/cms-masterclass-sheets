@@ -16,8 +16,11 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-FOLDER_ID = "1RkvEGKgLl55BYvnuImmu63plUM3H3bud"
-TEMPLATE_ID = "14FZdsESQMlfHhIt1ikHCZqWJC0ijcP63pRyZ96z4Wlk"
+#FOLDER_ID = "1RkvEGKgLl55BYvnuImmu63plUM3H3bud"
+#TEMPLATE_ID = "14FZdsESQMlfHhIt1ikHCZqWJC0ijcP63pRyZ96z4Wlk"
+
+FOLDER_ID = "1Y8aPdGVwqcGHw1mLQdy4WQlwvQ3RadEo"
+TEMPLATE_ID = "15G5Nz7Xe-zd0vzx9SvBJ3IMixORfqxaoJVBlL5BNTuY"
 
 def get_creds():
     creds = None
@@ -73,7 +76,12 @@ def main(name, sheets):
     drive_service = build("drive", "v3", credentials=creds)
 
     copy_body = {"name": name, "parents": [FOLDER_ID]}
-    copy = drive_service.files().copy(fileId=TEMPLATE_ID, body=copy_body).execute()
+    
+    copy = drive_service.files().copy(
+        fileId=TEMPLATE_ID,
+        body=copy_body,
+        supportsAllDrives=True
+    ).execute()
 
     NEW_SPREADSHEET_ID = copy["id"]
 

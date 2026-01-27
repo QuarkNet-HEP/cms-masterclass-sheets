@@ -16,8 +16,11 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-FOLDER_ID = "1RkvEGKgLl55BYvnuImmu63plUM3H3bud"
-TEMPLATE_ID = "11sJ0EfePCpdH3nVO7__pynvSlcXnv7WzvNf5TeACrxc"
+#FOLDER_ID = "1RkvEGKgLl55BYvnuImmu63plUM3H3bud"
+#TEMPLATE_ID = "11sJ0EfePCpdH3nVO7__pynvSlcXnv7WzvNf5TeACrxc"
+
+FOLDER_ID = "1Y8aPdGVwqcGHw1mLQdy4WQlwvQ3RadEo"
+TEMPLATE_ID = "1zXuH-E73bkvQOUnX8-SCp_3wf-0mXOCRlO1buZHj77Q"
 
 def get_creds():
     creds = None
@@ -302,8 +305,16 @@ def main(name, tabs):
     sheets_service = build("sheets", "v4", credentials=creds)
     drive_service = build("drive", "v3", credentials=creds)
 
+    about = drive_service.about().get(fields="user").execute()
+    print("Authenticated as:", about["user"]["emailAddress"])
+
     copy_body = {"name": name, "parents": [FOLDER_ID]}
-    copy = drive_service.files().copy(fileId=TEMPLATE_ID, body=copy_body).execute()
+    
+    copy = drive_service.files().copy(
+        fileId=TEMPLATE_ID,
+        body=copy_body,
+        supportsAllDrives=True
+    ).execute()
 
     NEW_SPREADSHEET_ID = copy["id"]
     print(f"New spreadsheet ID: {NEW_SPREADSHEET_ID}")
