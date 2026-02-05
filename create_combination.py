@@ -67,7 +67,7 @@ def vstack_formula(col: str, sheets: List[str]) -> str:
     type=str,
     multiple=True,
     required=True,
-    help=": Specify sheets to summarize by url --sheet <str>"
+    help=": Specify sheets to summarize by sheet id --sheet <str>"
 ) 
 def main(name, sheets):
     creds = get_creds()
@@ -76,6 +76,9 @@ def main(name, sheets):
     drive_service = build("drive", "v3", credentials=creds)
 
     copy_body = {"name": name, "parents": [FOLDER_ID]}
+
+    url = "https://docs.google.com/spreadsheets/d/"
+    sheets = [f"{url}{sid}" for sid in sheets]
     
     copy = drive_service.files().copy(
         fileId=TEMPLATE_ID,
@@ -135,6 +138,26 @@ def main(name, sheets):
             "data": [
                 {"range": "Combination!Y1", "values": [[formula_y]]},
                 {"range": "Combination!Z1", "values": [[formula_z]]},
+            ],
+        },
+    ).execute()
+
+
+    # Insert a formula in a cell with simple import ranges
+    # in order to activate access to the input sheets
+    # (which has to be done manually)
+    refs = [f'IMPORTRANGE("{url}","Results!A3")' for url in sheets]
+    formula = f"=SUM({', '.join(refs)})"
+
+    sheets_service.spreadsheets().values().batchUpdate(
+        spreadsheetId=NEW_SPREADSHEET_ID,
+        body={
+            "valueInputOption":"USER_ENTERED",
+            "data": [
+                {
+                    "range": "Combination!U1",
+                    "values": [[formula]]
+                }
             ],
         },
     ).execute()
