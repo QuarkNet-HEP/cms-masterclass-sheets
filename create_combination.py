@@ -1,12 +1,13 @@
 import os.path
-import re
 import click
 
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
-from typing import List, Tuple, Dict, Optional
+from typing import List
 
 OAUTH_CLIENT_FILE = "oauth_client_secret.json"
 TOKEN_FILE = "token.json"
@@ -16,42 +17,62 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive",
 ]
 
-#FOLDER_ID = "1RkvEGKgLl55BYvnuImmu63plUM3H3bud"
-#TEMPLATE_ID = "14FZdsESQMlfHhIt1ikHCZqWJC0ijcP63pRyZ96z4Wlk"
+# FOLDER_ID = "1RkvEGKgLl55BYvnuImmu63plUM3H3bud"
+# TEMPLATE_ID = "14FZdsESQMlfHhIt1ikHCZqWJC0ijcP63pRyZ96z4Wlk"
 
 FOLDER_ID = "1Y8aPdGVwqcGHw1mLQdy4WQlwvQ3RadEo"
 TEMPLATE_ID = "15G5Nz7Xe-zd0vzx9SvBJ3IMixORfqxaoJVBlL5BNTuY"
+
 
 def get_creds():
     creds = None
     if os.path.exists(TOKEN_FILE):
         creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
 
-    '''
+    """
     FIXME Request fails. If this happens, remove the token and re-run
-    '''
+    """
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                OAUTH_CLIENT_FILE, SCOPES
-            )
+            flow = InstalledAppFlow.from_client_secrets_file(OAUTH_CLIENT_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
-    
+
         with open(TOKEN_FILE, "w") as token:
             token.write(creds.to_json())
 
     return creds
 
+
+def validate_sheet_ids(service, sheet_ids: List[str]):
+    invalid = []
+    for sid in sheet_ids:
+        try:
+            service.spreadsheets().get(
+                spreadsheetId=sid, fields="spreadsheetId"
+            ).execute(num_retries=5)
+        except HttpError as e:
+            if e.status_code == 404:
+                invalid.append((sid, "not found"))
+            elif e.status_code == 403:
+                invalid.append((sid, "no access"))
+            else:
+                invalid.append((sid, str(e)))
+
+    if invalid:
+        for sid, reason in invalid:
+            print(f"Invalid sheet ID '{sid}': {reason}")
+        raise SystemExit(1)
+
+
 def vstack_formula(col: str, sheets: List[str]) -> str:
 
     refs = [f'IMPORTRANGE("{url}","Results!{col}1:{col}")' for url in sheets]
     vstack = f"VSTACK({', '.join(refs)})"
-    
-    return (
-        f'=IFERROR(LET(data,{vstack},FILTER(data,ISNUMBER(data))),"")'
-    )
+
+    return f'=IFERROR(LET(data,{vstack},FILTER(data,ISNUMBER(data))),"")'
+
 
 @click.command()
 @click.option(
@@ -59,7 +80,7 @@ def vstack_formula(col: str, sheets: List[str]) -> str:
     "name",
     type=str,
     required=True,
-    help="Add a new spreadsheet with the name: --sheetname <str>"
+    help="Add a new spreadsheet with the name: --sheetname <str>",
 )
 @click.option(
     "--sheet",
@@ -67,46 +88,42 @@ def vstack_formula(col: str, sheets: List[str]) -> str:
     type=str,
     multiple=True,
     required=True,
-    help=": Specify sheets to summarize by sheet id --sheet <str>"
-) 
+    help=": Specify sheets to summarize by sheet id --sheet <str>",
+)
 def main(name, sheets):
     creds = get_creds()
 
     sheets_service = build("sheets", "v4", credentials=creds)
     drive_service = build("drive", "v3", credentials=creds)
 
+    validate_sheet_ids(sheets_service, list(sheets))
+
     copy_body = {"name": name, "parents": [FOLDER_ID]}
 
     url = "https://docs.google.com/spreadsheets/d/"
     sheets = [f"{url}{sid}" for sid in sheets]
-    
-    copy = drive_service.files().copy(
-        fileId=TEMPLATE_ID,
-        body=copy_body,
-        supportsAllDrives=True
-    ).execute()
+
+    copy = (
+        drive_service.files()
+        .copy(fileId=TEMPLATE_ID, body=copy_body, supportsAllDrives=True)
+        .execute(num_retries=5)
+    )
 
     NEW_SPREADSHEET_ID = copy["id"]
 
     # Copy the template to a new sheet
-    spreadsheet = sheets_service.spreadsheets().get(
+    sheets_service.spreadsheets().get(
         spreadsheetId=NEW_SPREADSHEET_ID,
         fields="sheets(properties(sheetId,title,gridProperties(rowCount,columnCount)))",
-    ).execute()
+    ).execute(num_retries=5)
 
     # Populate the cells for electron/muon and W+/W- information
-    
-    source_cells = [
-        "Results!A3",
-        "Results!B3",
-        "Results!A7",
-        "Results!B7"
-    ]
+
+    source_cells = ["Results!A3", "Results!B3", "Results!A7", "Results!B7"]
 
     data = []
 
     for source_cell in source_cells:
-
         dest_range = source_cell.replace("Results", "Combination")
 
         parts = [
@@ -114,7 +131,7 @@ def main(name, sheets):
         ]
 
         formula = "=SUM(" + ",".join(parts) + ")"
-            
+
         data.append({"range": dest_range, "values": [[formula]]})
 
     sheets_service.spreadsheets().values().batchUpdate(
@@ -123,11 +140,11 @@ def main(name, sheets):
             "valueInputOption": "USER_ENTERED",
             "data": data,
         },
-    ).execute()
+    ).execute(num_retries=5)
 
     # Copy the data from columns Y,Z from Results to Combination in the new sheet
     # The plots will then be populated automatically
-    
+
     formula_y = vstack_formula("Y", sheets)
     formula_z = vstack_formula("Z", sheets)
 
@@ -140,8 +157,7 @@ def main(name, sheets):
                 {"range": "Combination!Z1", "values": [[formula_z]]},
             ],
         },
-    ).execute()
-
+    ).execute(num_retries=5)
 
     # Insert a formula in a cell with simple import ranges
     # in order to activate access to the input sheets
@@ -152,16 +168,11 @@ def main(name, sheets):
     sheets_service.spreadsheets().values().batchUpdate(
         spreadsheetId=NEW_SPREADSHEET_ID,
         body={
-            "valueInputOption":"USER_ENTERED",
-            "data": [
-                {
-                    "range": "Combination!U1",
-                    "values": [[formula]]
-                }
-            ],
+            "valueInputOption": "USER_ENTERED",
+            "data": [{"range": "Combination!U1", "values": [[formula]]}],
         },
-    ).execute()
+    ).execute(num_retries=5)
 
-    
+
 if __name__ == "__main__":
     main()

@@ -49,3 +49,34 @@ Options:
   --help        Show this message and exit.
 ```
 
+## Developing
+
+### Linting
+
+[Ruff](https://docs.astral.sh/ruff/) is used for linting and formatting. It is installed as part of `requirements.txt`.
+
+To run ruff locally:
+```
+# check for errors
+ruff check create_combination.py create_sheet2_optimized.py
+
+# check and auto-fix
+ruff check --fix create_combination.py create_sheet2_optimized.py
+
+# format
+ruff format create_combination.py create_sheet2_optimized.py
+```
+
+### Pre-commit
+
+[pre-commit](https://pre-commit.com/) is used to run ruff automatically before each commit. It is installed as part of `requirements.txt`.
+
+After installing dependencies, enable the hook with:
+```
+pre-commit install
+```
+
+Ruff will then run automatically on staged files whenever you `git commit`. To run it manually:
+```
+pre-commit run --all-files
+```
